@@ -1,3 +1,4 @@
+-- SUPERSEDED inventory prototype. Do not apply with production booking RPC draft.
 -- DRAFT ONLY. Do not execute against Supabase before explicit approval.
 -- Additive module schema. No changes to existing public.bookings or existing data.
 -- Requires reviewed integration of production bookings/identity/slot lifecycle first.

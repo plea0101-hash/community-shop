@@ -1,5 +1,7 @@
 # 預約取消模組：整合與測試說明
 
+> 本文件保留先前 cs_ 原型的說明。正式 bookings 設計已更新，請以 [production-booking-integration-design.md](production-booking-integration-design.md) 及新 RPC 草稿為準；舊獨立庫存草稿已取代，不得套用。
+
 ## 現在可審查的成果
 
 獨立入口 `/cancellation/`，不改動首頁及既有正式預約資料。提供 Supabase Auth 電子郵件/密碼登入、廠商/社區預約清單、原因及二次確認、取消紀錄、重新申請、頁內通知、管理員查核、取消頻率查詢。沒有前端角色選單授權；每個 RPC 在資料庫檢查 auth.uid()。
