@@ -141,6 +141,12 @@
 
 repo公開、config含正式project URL與sb_publishable（不重印，不當service_role秘密）；清除新產物config不修復原API直接存取。只沿既有metadata記錄TRUNCATE／default ACL風險，不連正式Supabase重新測403或試DCL。GitHub Deployments查無紀錄不能證明無Vercel部署，實際主機／auto-deploy／域名／env還缺證據。
 
-展示欠缺：五區明確展示文案、真／假資料分離、穩定空狀態、白名單產物及測試入口阻擋、正式連線零依賴、手機桌面／錯誤／主機安全驗收與核准。候選採獨立純靜態展示，不要求先實作完整會員／bookings／金流／年度流程，但原正式資料暴露不可忽略，隔離／舊環境處置及殘餘風險須另核准。
+展示欠缺：五區／集中品牌、四角色／三後台新製模擬、真／假資料分離、穩定空狀態、白名單產物及測試入口阻擋、正式連線零依賴、手機桌面／錯誤／主機安全驗收與核准。已確認獨立Vercel／網址與本機虛構互動，不要求先實作完整會員／bookings／金流／年度流程，但原正式資料暴露不可忽略，隔離／舊環境處置及殘餘風險須另核准。
 
-詳[展示計畫](public-demo-mvp-plan.md)對照及[驗收清單](public-demo-acceptance-checklist.md)C01–C14。展示估3–5專注工作日，商用66–100保留；現在No-Go，無新展示程式、部署或功能測試證據。本輪只文件，既有A／B未核准未執行、service_role DML不擴權。
+詳[展示計畫](public-demo-mvp-plan.md)對照及[驗收清單](public-demo-acceptance-checklist.md)C01–C17。展示原純內容3–5已改互動版8–12專注工作日，商用66–100保留；現在No-Go，無新展示程式、部署或功能測試證據。本輪只文件，既有A／B未核准未執行、service_role DML不擴權。
+
+## 11. 虛擬會員增量與現況界線
+
+[虛擬角色設計](public-demo-virtual-experience.md)列平台6／社區5／廠商5模組及訪客五區、集中品牌與scenario。現有Auth取消原型及localStorage示範不是新隔離互動版，不能直接發布充數；目前無已證實的新角色選擇／品牌集中來源／跨角色記憶體流程，文件不等於實作。獨立專案／網址、四角色、全虛構與基本互動均已確認；具體介面深度／reset生命週期與素材待確認。
+
+本次範圍擴張使展示估8–12日（較舊3–5增加約5–7），不是完整商用估算變更。虛擬角色無安全授權、不接正式服務；原公開API／ACL風險未修，No-Go及人工簽認要求保留。只Markdown，無程式／SQL／正式操作或測試執行。
