@@ -1,13 +1,16 @@
 -- DRAFT ONLY: no remote execution or deployment authorized.
 -- Uses public.bookings exclusively. Supersedes the cs_ inventory draft; NEVER apply both.
--- Requires reviewed membership provisioning, unredacted status contract and existing RPC bodies.
+-- Confirmed pending/confirmed [) contract; membership/payment and cancellation state still require review.
 BEGIN;
 CREATE TABLE public.booking_workflow_config (
  singleton boolean PRIMARY KEY CHECK(singleton),
- active_states text[], create_state text, cancelled_state text,
- brand_state text, venue_state text, community_state text
+ active_states text[] NOT NULL DEFAULT ARRAY['pending','confirmed']::text[] CHECK(active_states=ARRAY['pending','confirmed']::text[]),
+ create_state text NOT NULL DEFAULT 'pending' CHECK(create_state='pending'), cancelled_state text,
+ brand_state text, venue_state text NOT NULL DEFAULT 'available' CHECK(venue_state='available'), community_state text,
+ membership_reviewed boolean NOT NULL DEFAULT false, payment_reviewed boolean NOT NULL DEFAULT false
 );
--- Deliberately disabled until exact production contract has been reviewed.
+-- Confirmed structural defaults are seeded; defaults pending are NOT eligibility approval.
+-- Membership/payment gates and unconfirmed eligibility/cancellation mapping remain closed.
 INSERT INTO public.booking_workflow_config(singleton) VALUES(true);
 CREATE TABLE public.booking_brand_members (
  brand_id bigint REFERENCES public.brands(id), user_id uuid REFERENCES auth.users(id),
@@ -57,10 +60,10 @@ CREATE FUNCTION public.booking_actor_is_admin() RETURNS boolean LANGUAGE sql STA
  SELECT auth.uid() IS NOT NULL AND EXISTS(SELECT 1 FROM public.platform_admins WHERE user_id=auth.uid());
 $$;
 CREATE FUNCTION public.booking_can_brand(p_brand bigint) RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path='' AS $$
- SELECT auth.uid() IS NOT NULL AND EXISTS(SELECT 1 FROM public.booking_brand_members WHERE brand_id=p_brand AND user_id=auth.uid() AND can_manage);
+ SELECT auth.uid() IS NOT NULL AND EXISTS(SELECT 1 FROM public.booking_workflow_config WHERE singleton AND membership_reviewed) AND EXISTS(SELECT 1 FROM public.booking_brand_members WHERE brand_id=p_brand AND user_id=auth.uid() AND can_manage);
 $$;
 CREATE FUNCTION public.booking_can_community(p_community bigint) RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path='' AS $$
- SELECT auth.uid() IS NOT NULL AND EXISTS(SELECT 1 FROM public.booking_community_members WHERE community_id=p_community AND user_id=auth.uid() AND can_manage);
+ SELECT auth.uid() IS NOT NULL AND EXISTS(SELECT 1 FROM public.booking_workflow_config WHERE singleton AND membership_reviewed) AND EXISTS(SELECT 1 FROM public.booking_community_members WHERE community_id=p_community AND user_id=auth.uid() AND can_manage);
 $$;
 CREATE FUNCTION public.booking_can_read(p_booking bigint) RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path='' AS $$
  SELECT EXISTS(SELECT 1 FROM public.bookings b JOIN public.venues v ON v.id=b.venue_id
@@ -69,7 +72,7 @@ $$;
 -- Fail closed: config must exactly match the existing two-state partial exclusion predicate.
 -- Expected canonical text is based on the supplied real catalog shape, not inferred status names.
 CREATE FUNCTION public.booking_checked_config() RETURNS public.booking_workflow_config LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
-DECLARE c public.booking_workflow_config; pred text; idx text; exclusion text;
+DECLARE c public.booking_workflow_config; pred text; idx text; exclusion text; default_expr text; table_name text;
 BEGIN
  SELECT * INTO STRICT c FROM public.booking_workflow_config WHERE singleton;
  IF cardinality(c.active_states) IS DISTINCT FROM 2 OR c.create_state IS NULL OR c.cancelled_state IS NULL
@@ -84,6 +87,17 @@ BEGIN
  IF pred IS NULL OR regexp_replace(pred,'\s','','g') <> regexp_replace(format('(status = ANY (ARRAY[%L::text, %L::text]))',c.active_states[1],c.active_states[2]),'\s','','g')
  OR position('tstzrange(start_time, end_time, ''[)''::text)' IN idx)=0
  THEN RAISE EXCEPTION 'production_overlap_contract_mismatch'; END IF;
+ FOREACH table_name IN ARRAY ARRAY['bookings','brands','communities','venues'] LOOP
+  SELECT pg_catalog.pg_get_expr(d.adbin,d.adrelid) INTO default_expr
+  FROM pg_catalog.pg_attrdef d JOIN pg_catalog.pg_class r ON r.oid=d.adrelid
+  JOIN pg_catalog.pg_namespace n ON n.oid=r.relnamespace
+  JOIN pg_catalog.pg_attribute a ON a.attrelid=r.oid AND a.attnum=d.adnum
+  WHERE n.nspname='public' AND r.relname=table_name AND a.attname='status';
+  IF default_expr IS DISTINCT FROM format('%L::text',CASE WHEN table_name='venues' THEN 'available' ELSE 'pending' END) THEN RAISE EXCEPTION 'production_status_default_mismatch'; END IF;
+ END LOOP;
+ IF NOT EXISTS(SELECT 1 FROM pg_catalog.pg_constraint k WHERE k.conrelid='public.bookings'::regclass AND k.conname='bookings_valid_time' AND k.contype='c' AND k.convalidated AND regexp_replace(pg_catalog.pg_get_expr(k.conbin,k.conrelid),'[()\s]','','g')='end_time>start_time') THEN RAISE EXCEPTION 'production_time_check_mismatch'; END IF;
+ IF NOT c.membership_reviewed THEN RAISE EXCEPTION 'membership_review_required'; END IF;
+ IF NOT c.payment_reviewed THEN RAISE EXCEPTION 'payment_review_required'; END IF;
  RETURN c;
 END;
 $$;
@@ -145,6 +159,7 @@ CREATE FUNCTION public.booking_reapply(p_cancelled bigint,p_venue bigint,p_start
 RETURNS text LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
 DECLARE brand bigint;
 BEGIN
+ PERFORM public.booking_checked_config();
  SELECT brand_id INTO brand FROM public.bookings WHERE id=p_cancelled;
  IF NOT FOUND OR NOT public.booking_can_brand(brand) THEN RAISE EXCEPTION 'source_not_accessible'; END IF;
  RETURN public.booking_submit_internal(p_venue,brand,p_start,p_end,p_key,p_cancelled)::text;
@@ -202,6 +217,7 @@ RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
 DECLARE e public.booking_cancellation_events; b public.bookings; community bigint; rid uuid;
 BEGIN
  IF NOT public.booking_actor_is_admin() THEN RAISE EXCEPTION 'admin_required'; END IF;
+ PERFORM public.booking_checked_config();
  SELECT * INTO e FROM public.booking_cancellation_events WHERE id=p_event FOR UPDATE;
  IF NOT FOUND OR e.typhoon_status<>'pending' THEN RAISE EXCEPTION 'not_pending_review'; END IF;
  SELECT * INTO b FROM public.bookings WHERE id=e.booking_id;

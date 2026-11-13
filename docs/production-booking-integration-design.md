@@ -1,6 +1,6 @@
 # 正式 bookings 整合設計（依使用者提供的真實 schema 更新）
 
-盤點日期：2026-11-13。來源為使用者提供的 `schema_inventory`，不是本機猜測或重新連線正式庫。未將上傳內容／個資／金鑰寫入測試資料。本階段只產生 SQL 草稿、文件及本機測試。
+盤點日期：2026-11-13。來源為使用者提供的 `schema_inventory` 與後續正式唯讀補查契約，不是本機猜測或重新連線正式庫。未將上傳內容／個資／金鑰寫入測試資料。本階段只產生 SQL 草稿、文件及本機測試。
 
 ## 1. 已確認結構
 
@@ -21,14 +21,15 @@
 
 - `bookings_valid_time` 已檢查 `end_time > start_time`。
 - `bookings_no_overlap` 是已驗證、非延後檢查的 GiST exclusion constraint：相同 venue_id（=）且 `tstzrange(start_time,end_time,邊界)` 重疊（&&）時禁止插入；它的 predicate 僅涵蓋兩個 status。
-- **兩個 status 與 range 邊界被前次查詢遮蔽，不能推定就是 pending/confirmed 或 [)。** 測試採這些字串及邊界作為明確標示的合成 fixture；正式配置預設全為 NULL、RPC 拒絕啟用。若真實邊界不同，須先修訂契約檢查和測試，不修改既有約束硬湊。
+- **後續補查已確認 active 狀態為 pending、confirmed，range 為 [)。** bookings、brands、communities 的 status 預設 pending，venues 預設 available；這些不再是測試假設。草稿配置已填入 active_states、create_state=pending、venue_state=available，並驗證真實 schema 的預設值及有效時間 CHECK；契約漂移則拒絕。會員／付款審查開關仍預設 false，資格與取消終態配置仍須明確審核。
+- pending 只是初始狀態，**不代表品牌／社區已通過資格審核**。不以預設 pending 自動開放預約。
 - bookings 沒有 status CHECK／enum（本次 17 個限制中只有其時間 CHECK）。普通文字欄位本身不會保證狀態機正確。新 RPC 不接受客戶端 status，僅採人工核准的工作流程配置；無法識別的舊狀態不允許以此取消。不新增猜測的全表狀態 CHECK 或更新歷史資料。
 - 取消必須把同一筆 bookings 狀態轉為排他 predicate 之外的取消狀態，原始起訖不改；因此新申請可重新競爭該 range。絕不建立 cs_slots、cs_bookings 或另加庫存計數。
 - `public_booking_calendar` 與 `get_booked_slots()` 是否也使用相同狀態集合尚待確認。排他約束是最後裁決，前端的空檔查詢不是鎖，也不代表一定申請成功。
 
 ## 3. 權限與現有風險
 
-bookings RLS 目前只有平台管理員 ALL policy，沒有廠商／社區會員 policy。表級 ACL 中 anon/authenticated 沒有 SELECT/INSERT/UPDATE/DELETE，卻有 TRUNCATE、TRIGGER、REFERENCES、MAINTAIN。**TRUNCATE 不受 RLS 保護，不能因 anon 無 SELECT 就判定資料安全。** ACL 是否還有繼承路徑，須用補查的有效權限確認；本階段不對正式庫試做任何破壞性操作。
+bookings RLS 目前只有平台管理員 ALL policy，沒有廠商／社區會員 policy。表級 ACL 中 anon/authenticated 沒有 SELECT/INSERT/UPDATE/DELETE，卻有 TRUNCATE、TRIGGER、REFERENCES、MAINTAIN。**TRUNCATE 不受 RLS 保護，不能因 anon 無 SELECT 就判定資料安全。** 後續補查確認 anon/authenticated 的 SELECT、INSERT、UPDATE 有效值 false，TRUNCATE true。先前 ACL 已列直接授權；是否另有 PUBLIC／父角色路徑、授權人及 default ACL 則仍未提供。本階段不查詢正式庫、不試做破壞性操作，詳細來源分析與最小修正見 [truncate-privilege-review.md](truncate-privilege-review.md)。
 
 本 schema 沒有 brands／communities 對 Auth 使用者的正式會員關係。因此草稿提議增加 `booking_brand_members`／`booking_community_members`，只保存已經受信任審核的組織授權，普通使用者無讀寫或自助加入權限。若其他私有 schema 已有相應關係，正式版應改接既有來源，不能重複建立兩套會員權限。
 
@@ -51,7 +52,7 @@ bookings RLS 目前只有平台管理員 ALL policy，沒有廠商／社區會�
 
 ### 工作流程配置不等於第二套庫存
 
-`booking_workflow_config` 只保存已審核狀態代碼：兩個 active_states、create_state、cancelled_state、brand/venue/community 資格狀態。預設未配置，所有寫入 RPC 都拒絕；只有受信任 DB 管理流程可以配置。執行時驗證實際排他約束的狀態 predicate、=／&& 操作符及 [) range 形式完全相符。這是防止錯誤啟用的契約檢查，**不是自動判斷品牌已核准、退款或上線核准**。
+`booking_workflow_config` 保存工作流程代碼與兩個審查開關。已確認 active_states=[pending,confirmed]、create_state=pending、venue_state=available，並用 CHECK 固定；brand_state/community_state 資格代碼及 cancelled_state 仍為 NULL，membership_reviewed/payment_reviewed 仍為 false，因此所有建立／取消／重新申請均預設拒絕。只有受信任 DB 管理流程可以配置。會員審查為 false 時，品牌／社區會員 helper 與 RLS 亦拒絕，不能只靠事先插入 can_manage=true 的會員資料就開放讀取；颱風查核 RPC 也先檢查啟用契約。不能只因建立會員資料或填入狀態就繞過會員／付款審查；測試才在一次性資料庫明確設為 true。執行時驗證實際排他約束的狀態 predicate、=／&& 操作符及 [) range 形式完全相符。這是防止錯誤啟用的契約檢查，**不是自動判斷品牌已核准、退款或上線核准**。
 
 ### 鎖與冪等性
 
@@ -67,16 +68,18 @@ bookings RLS 目前只有平台管理員 ALL policy，沒有廠商／社區會�
 
 ## 5. 尚需補齊，不可直接啟用
 
-1. 執行唯讀 `sql/inspection/booking_contract_details.sql`，回傳未遮蔽的業務狀態預設值、排他約束及有效角色權限。這份僅查 metadata，不讀預約資料。請確認兩個有效占位狀態、建立／取消狀態及各實體資格狀態的業務意義。
+1. active 狀態、[) 邊界、時間 CHECK 及四表預設值已確認，不再重複索取。仍需審查品牌／社區資格狀態、取消終態與具體會員授權流程；來源查詢 `sql/inspection/truncate_privilege_sources.sql` 僅供之後由使用者自行檢閱／執行，不由本工作連線正式庫。
 2. 提供經人工去識別化的 get_booked_slots、is_platform_admin 本文，以及其他 schema 是否已有組織會員；不需要 key 或真實使用者資料。`community_registrations.owner_id` 不能直接接 community bigint。
 3. 確認未列在此公開 schema 的實際核准、付款、退款、排程及後台 DML 來源。草稿只建立待審／占位狀態，沒有核准／付款／退款 RPC；確認前不得因撤銷直接 DML 而中斷既有管理流程。
 4. 社區重新申請目前採「由原廠商重新提出」；若要社區發邀請，另設不占位的邀請資料及廠商同意流程，不能直接建立已同意預約。
-5. 會員配置、通知 worker、實際 Supabase Auth/PostgREST、真正 PostgreSQL 多連線競爭與 staging 驗證仍未完成。資料庫安裝、配置、舊 UI 改接新 RPC、部署分別需要後續確認，不能因本機測試通過就啟用。
+5. 會員配置、通知 worker、實際 Supabase Auth/PostgREST、付款回呼及 staging 驗證仍未完成。本機真正 PostgreSQL 多連線競爭已有 6 個場景通過；這不替代正式環境服務流程驗證。資料庫安裝、配置、舊 UI 改接新 RPC、部署分別需要後續確認，不能因本機測試通過就啟用。
 
 ## 6. 測試範圍
 
-`tests/production-booking.test.js` 以收到的 bigint/FK/timestamptz/time CHECK／GiST 結構建構一次性 PGlite PostgreSQL，使用 btree_gist 擴充，所有聯絡資料與使用者均合成。被遮蔽的 active 狀態採 pending/confirmed、取消採 cancelled、區間 [)；**這些是測試假設，不是正式 schema 已確認的常數**。fixture 只重建測試所需的真實欄位／關聯，沒有假裝完整復刻預設值、現有 definer 本文、公開 view 或所有 ACL。
+`tests/production-booking.test.js` 以收到的 bigint/FK/timestamptz/time CHECK／GiST 結構建立一次性 PGlite PostgreSQL，並使用 btree_gist；active=pending/confirmed、建立 pending、四表預設及 [) 已確認。所有身分、聯絡欄位及測試預約均合成。資格 approved、取消終態 cancelled、會員配置與審查開關 true 仍只是受控本機 fixture，不代表正式審查已完成。
 
-覆蓋：預設禁用、契約不符拒絕、直接 DML/TRUNCATE/私有 helper 拒絕、角色隔離、請求去重與時區一致、部分／包含重疊拒絕、相鄰／異場地通過、取消釋放、新 ID 重新申請、雙方取消與管理員不得冒名、24 小時微秒邊界、臨時原因、開始後拒絕、颱風審核歷史與 RLS 統計、缺收件者仍有組織 outbox、失敗回滾，以及補查 SQL 在 READ ONLY 交易可執行。
+新增涵蓋會員／付款未審的三種寫入拒絕、重複取消不改原原因且不釋放替代預約、取消中途 outbox 失敗整體回滾、預設值／CHECK 漂移拒絕、pending 不自動合格。`tests/truncate-privileges.test.js` 驗證直接／PUBLIC／繼承及全域／schema default ACL，並在可回滾的本機合成交易證明 RLS 不防護 TRUNCATE。
 
-PGlite 是單連線模型；雖使用真正 PostgreSQL GiST 排他機制，未驗證多連線等待、死結／lock timeout、實際 Supabase 角色繼承、付款並行回呼或正式資料相容性。舊瀏覽器測試仍只覆蓋 cs_ UI 原型，不證明新 SQL 已與 UI 串接。
+`tests/postgres_concurrency.py` 在固定官方映像 digest 的 PostgreSQL 17.12 容器，以獨立 psql 連線及 pg_blocking_pids 證明競爭等待，驗證六個場景：同時重疊預約、相同請求 key、雙方重複取消、建立回滾後另一方取得時段、取消回滾後仍占位、取消與重新申請競爭。容器 network=none、listen_addresses 空、無公開埠、資料在 tmpfs，結束移除；不連 Supabase。
+
+完整結果見 [production-booking-test-results.md](production-booking-test-results.md)。未涵蓋正式 Supabase JWT／角色設定、實際核准與付款回呼、外送服務或高負載壓測。舊瀏覽器測試仍只覆蓋 cs_ UI 原型，前端未改接新 RPC。
