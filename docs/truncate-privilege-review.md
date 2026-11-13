@@ -11,6 +11,12 @@
 
 因此目前有兩個獨立暴露面：現有 bookings 的直接授權，以及未來兩個建立者的 public 表預設授權。修正其中一個不會自動修正另一個。`membership_paths` 是 DB 角色圖，不是應用的社區／廠商會員資格；不能因此啟用未審核的預約授權。
 
+## 最新執行者結果與限制
+
+使用者正式預檢已確認 active_identity=bookings_owner=postgres、owner privileges=true、TRUNCATE grant option=true，但 active_is_superuser=false。對 supabase_admin 的 MEMBER/USAGE/SET/candidate 皆 false；因此 A 的表級權限條件具備但未核准／未執行，完整 default 階段 B 對目前身分明確 blocked。詳見 [truncate-execution-restrictions.md](truncate-execution-restrictions.md)。
+
+Codex 不執行正式 SQL，不自動拆 default 檔案跑 postgres-only 部分，不自行 SET ROLE、GRANT membership 或提權。A 的獨立核准不包含 B；後續僅能透過平台確認的獲授權操作者與受支援管道處理 B。
+
 ## 精確修改範圍
 
 1. `sql/drafts/20261113_truncate_minimum.sql`：只對 public.bookings 撤銷 anon/authenticated 的 TRUNCATE。不改 PUBLIC、其他表、DML、SELECT、RLS、role membership、owner，也不給任何新權限。
@@ -24,7 +30,7 @@ PostgreSQL 的 TABLES default ACL 依「建立者＋schema」套用，不能只�
 
 雖然目前沒有繼承路徑，執行時若新出現 PUBLIC／父角色、owner 繼承或 superuser 等來源，現有表腳本會拒絕部分修正。default ACL 若仍有 global、PUBLIC 或可繼承來源，也拒絕。不能以 public schema 的 REVOKE 抵銷 global default GRANT，腳本不擅自修改 global 或共享角色。
 
-執行者必須同時有權修改兩個建立者的 default privileges。Supabase 可能限制修改 supabase_admin；如果被平台拒絕，該份交易整體回滾，需由平台授權操作者處理，不能自行提升角色、GRANT membership 或假裝完成。已提交的 bookings 修正不必因此恢復不安全權限。
+執行者必須同時有權修改兩個建立者的 default privileges。本次已確認目前 postgres 沒有 supabase_admin 的角色權限證據，不能現在執行該份完整 default 草稿或拿正式失敗試權。若日後獲授權執行仍被平台拒絕，該份交易整體回滾，需由平台授權操作者處理，不能自行提升角色、GRANT membership 或假裝完成。已提交的 bookings 修正不必因此恢復不安全權限。
 
 ## 保留維護權限及應用限制
 

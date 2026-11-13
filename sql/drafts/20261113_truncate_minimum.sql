@@ -1,3 +1,7 @@
+-- EXECUTION LIMIT: docs-only update; Codex must not execute production SQL.
+-- Table-level authority conditions confirmed for postgres, but NOT approved/executed.
+-- Possible stage A ONLY after explicit independent approval, by a formal operator;
+-- does not authorize Codex execution or any partial/default-ACL stage.
 -- DRAFT ONLY: no production execution authorized.
 -- Confirmed source: postgres directly grants TRUNCATE to anon/authenticated;
 -- bookings owner=postgres, no membership paths observed. ONLY this table/privilege.

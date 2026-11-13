@@ -2,7 +2,7 @@
 
 ## 結論
 
-**兩份最小修正的 SQL 設計與本機技術驗證已具備；正式執行準備尚未全部具備。** 尚須確認真正執行身分能修改兩個 creator 的 default ACL、Supabase 平台授權、變更核准／時段及最新基線／回滾保存。這不是「可以直接執行」或「正式漏洞已修復」的結論。
+**目前 postgres 對現有 public.bookings 具備表級修正的權限條件，但正式核准與修正均未執行；對 supabase_admin defaults 的角色權限證據為否，完整 default ACL 修正受阻。** 可評估獨立核准階段 A 先處理既有表，但不能讓 Codex 自動拆 SQL、部分執行 default 修正或自行授權。權威限制見 [truncate-execution-restrictions.md](truncate-execution-restrictions.md)。
 
 本次沒有執行任何正式 SQL（包括唯讀探查）、沒有連線正式 Supabase、沒有資料／權限／部署／合併。正式狀態只來自使用者提供的修正前 JSON。
 
@@ -35,6 +35,12 @@
 
 本機已驗證：前後非目標與維護權限完全相同；靜態回滾與快照生成回滾能精確恢復原 ACL；另測 WITH GRANT OPTION 案例。先 default 再 bookings 的回滾會重新暴露風險，需明確核准。default 回滾不改修正期間建立的表，也不應替它們自動補權。未提交／失敗交易直接 ROLLBACK。
 
+## 已確認的正式執行者結果
+
+使用者提供：active_identity=postgres、bookings_owner=postgres、can_use_owner_privileges=true、has_truncate_grant_option=true、active_is_superuser=false；對 supabase_admin 的 MEMBER/USAGE/SET 與 catalog candidate 均 false。這支持現有表修正的權限條件，不支持完整 default ACL 執行，更不是正式變更核准或已修復證據。
+
+Codex 不自動 SET ROLE、GRANT membership 或提權；不以「先跑 postgres 部分」繞過受阻的完整 default 草稿。經獨立正式核准後，階段 A 可由正式操作者先處理；本輪只改文件及草稿註記，不執行。
+
 ## 正式執行者的確認方式
 
 另提供 `sql/inspection/truncate_executor_preflight.sql`，留待真正執行者另行核准後，以**同一 SQL Editor／連線及 active role**唯讀檢查，不由本工作在正式庫執行。
@@ -46,14 +52,16 @@
 3. 對 postgres/supabase_admin 各自的 MEMBER、USAGE、SET；**MEMBER 或可 SET ROLE 不等於目前身分已能執行 DCL**。NOINHERIT 情況在本機有反例測試。
 4. `current_identity_catalog_candidate` 只是 catalog 層級候選結果；即使 true，仍需專案／平台管理者確認該身分獲准修改 supabase_admin defaults，及其保留角色限制。不能從 SELECT 結果推定平台一定會放行。
 
-不在正式庫以「BEGIN → ALTER/REVOKE → ROLLBACK」試探權限，不自動 SET ROLE，不把 postgres/supabase_admin 授予操作者或自行提權。若只能處理 postgres，不能宣稱兩個 creator 已修好；須交由獲授權的平台操作者處理第二份完整交易。
+不在正式庫以「BEGIN → ALTER/REVOKE → ROLLBACK」試探權限，不自動 SET ROLE，不把 postgres/supabase_admin 授予操作者或自行提權。目前僅確認 bookings 表級條件；完整 default 檔保持 blocked，不能自動切出 postgres default 段，也不能宣稱兩個 creator 已修好。B 只能交由獲授權的平台操作者另行審查完整交易。
 
 ## 執行前仍須確認
 
-- [ ] 真正執行者及其平台授權，尤其 supabase_admin default ACL；目前未確認。
-- [ ] 另行取得兩階段正式變更核准與無並行 ACL／建表的短時段。
+- [x] 目前身分對現有 bookings 的 owner／grant-option 條件已由正式唯讀結果確認，尚未核准或執行修正。
+- [ ] 若要先做表級階段 A，取得其獨立正式核准、操作者／時段與殘餘風險接受。
+- [ ] 對 supabase_admin defaults 目前明確缺乏角色權限證據；由平台指定獲授權管道與操作者，不能自動拆開 default SQL。
+- [ ] default 階段 B 取得獨立正式核准；A 不授權 B，不因 PR 通過就執行任何正式 SQL。
 - [ ] 保存執行當下完整修正前 JSON、回滾指令與權限布林矩陣，確認無來源漂移。
-- [ ] 按執行方案先修 bookings、驗證，再修兩個 default ACL、驗證；如果第二步無權，保留第一步安全修正，不自動恢復漏洞。
+- [ ] 若 A 已獨立核准才由正式操作者處理；B 目前不執行、不試探、不自動切出 postgres 段。A 若未來完成而 B 仍受阻，不自動回滾 A 或宣稱完整修復。
 - [ ] 完成後由正式操作者提供新的唯讀結果，才能聲稱正式修復；本機成功不能替代此證據。
 
 應用的會員／付款／退款／核准回呼、通知 worker、前端改接仍是另案啟用前提；不能為了讓 service_role 直接操作預約而在本次順便補 DML。ACL 修正也不回溯清理其他既有表的 TRUNCATE，其他權限與來源須另行審查。

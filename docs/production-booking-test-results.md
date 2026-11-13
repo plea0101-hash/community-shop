@@ -55,6 +55,12 @@ npm run test:postgres
 
 ## 尚未完成的正式驗證
 
-最新正式來源已由使用者提供，無需再猜測 grantor／creator。本工作未連 Supabase、未執行正式修正，不宣稱正式 TRUNCATE 已修復。執行者對 supabase_admin default ACL 的實際授權與執行時來源漂移仍需在核准變更時確認。未測正式 JWT/PostgREST、會員核准來源、付款／退款／核准回呼、通知外送、staging 安裝及高負載壓測。前端仍為 cs_ 原型，未改接新 RPC。這些須審查後另行實作／驗證，不因本次本機並行通過就解除啟用限制。
+最新正式來源已由使用者提供，無需再猜測 grantor／creator。本工作未連 Supabase、未執行正式修正，不宣稱正式 TRUNCATE 已修復。最新正式預檢已確認目前 postgres 對 supabase_admin 的 MEMBER/USAGE/SET/candidate 全 false；完整 default 修正對此身分受阻，不得拆開執行或自行授權。表級 owner／grant option 條件具備仍不等於正式核准。未測正式 JWT/PostgREST、會員核准來源、付款／退款／核准回呼、通知外送、staging 安裝及高負載壓測。前端仍為 cs_ 原型，未改接新 RPC。這些須審查後另行實作／驗證，不因本次本機並行通過就解除啟用限制。
 
-**最後安全判定：本機技術驗證已完成；正式資料庫尚未修復，正式執行者的平台權限與變更核准仍待確認。** 不能將 40 項通過或本機回滾結果當成已執行正式修正。
+**最新安全判定：前輪本機技術驗證已完成；正式資料庫尚未修復。表級權限條件已確認，但 A 未核准／未執行；完整 default 階段 B 對目前 postgres 身分明確受阻。** 不能將 40 項通過或本機回滾結果當成已執行正式修正。
+
+## 本輪文件／草稿註記更新的驗證
+
+依使用者限制，本輪只更新文件與草稿註記。靜態比對確認兩份修正 SQL 的非註解內容與上一版完全相同；未拆成 postgres-only defaults、未新增 GRANT／SET ROLE／提權或自動執行器。`git diff --check` 通過。沒有重新執行 SQL 功能測試；上述 40 項與 PostgreSQL 6 個場景是前輪本機證據，不是本輪或正式執行結果。
+
+最新執行限制、部分修正風險與獨立核准清單見 [truncate-execution-restrictions.md](truncate-execution-restrictions.md)。

@@ -85,3 +85,7 @@ bookings RLS 目前只有平台管理員 ALL policy，沒有廠商／社區會�
 完整結果見 [production-booking-test-results.md](production-booking-test-results.md)。未涵蓋正式 Supabase JWT／角色設定、實際核准與付款回呼、外送服務或高負載壓測。舊瀏覽器測試仍只覆蓋 cs_ UI 原型，前端未改接新 RPC。
 
 最新修正前完整基線確認 service_role 對 bookings 的 SELECT/INSERT/UPDATE/DELETE=false；本次不補權。ACL 草稿／本機技術條件與正式執行準備應分開判定，詳見 [truncate-final-safety-review.md](truncate-final-safety-review.md)。
+
+## 最新正式執行限制（使用者已補執行者結果）
+
+postgres=bookings owner、owner privilege／grant option=true，具備表級修正的權限條件，但未核准且未執行；它不是 superuser，對 supabase_admin 的 MEMBER/USAGE/SET/candidate 全 false，完整 default ACL 修正受阻。可供決策的階段 A 須獨立正式核准，由正式操作者處理；Codex 不自動拆 SQL 執行、不跑 postgres-only default 段、不 SET ROLE、不授予角色。權威狀態與平台處理途徑見 [truncate-execution-restrictions.md](truncate-execution-restrictions.md)。

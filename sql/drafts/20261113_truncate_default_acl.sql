@@ -1,3 +1,8 @@
+-- EXECUTION LIMIT: docs-only update; Codex must not execute production SQL.
+-- BLOCKED for current postgres: no MEMBER/USAGE/SET authority for supabase_admin.
+-- Keep both creator statements atomic. Do not extract/run postgres-only SQL,
+-- auto SET ROLE, GRANT membership, elevate privileges or probe production DCL.
+-- Requires platform-supported authorized operator and separate stage-B approval.
 -- DRAFT ONLY. Separate approval required. Future public tables only, not existing tables.
 -- Operator must be authorized to alter BOTH creators' default privileges.
 BEGIN;

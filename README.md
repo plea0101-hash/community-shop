@@ -43,3 +43,7 @@
 - [正式執行者唯讀預檢](sql/inspection/truncate_executor_preflight.sql)（僅 catalog 候選判斷，不代表 Supabase 平台授權）
 
 最新測試精確保留正式基線的 service_role 預約表 SELECT/INSERT/UPDATE/DELETE=false；本機通過不代表正式資料庫已修復。
+
+- [最新正式執行限制、分階段核准與 supabase_admin 授權途徑](docs/truncate-execution-restrictions.md)
+
+最新預檢：postgres 具備 bookings 表級修正權限條件，但未核准／未執行；對 supabase_admin defaults 的角色權限證據為否，完整 default 修正受阻。Codex 不自動拆 SQL 執行，不自行 SET ROLE／GRANT membership／提權；A 若需先處理，須獨立正式核准，不包含 B。
