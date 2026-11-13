@@ -4,8 +4,8 @@
 
 ## 結果
 
-- `npm test`：**34 通過、0 失敗、0 跳過**。16 項正式 bookings 測試、3 項 TRUNCATE 來源／最小修正測試，以及保留的 15 項原型／領域／API 測試。
-- `npm run test:postgres`：**6 個真正多連線競爭場景全部通過**；另驗證未配置 RPC 拒絕與 anon/authenticated TRUNCATE 拒絕。實測 PostgreSQL **17.12 (Debian 17.12-1.pgdg12+1)**，非 PGlite 的模擬並行。
+- `npm test`：**38 通過、0 失敗、0 跳過**。16 項正式 bookings 測試、7 項 TRUNCATE 最小修正／default ACL／維護權限／回滾測試，以及保留的 15 項原型／領域／API 測試。
+- `npm run test:postgres`：先驗證兩個 ACL 修正、兩個建立者的未來表、postgres/service_role 維護權限、快照精確回滾及重新套用，再驗證 **6 個真正多連線競爭場景全部通過**；另驗證未配置 RPC 拒絕與 anon/authenticated TRUNCATE 拒絕。實測 PostgreSQL **17.12 (Debian 17.12-1.pgdg12+1)**，非 PGlite 的模擬並行。
 - `git diff --check`：通過。首頁、config.js 與 cancellation/ 前端未變；沒有正式 SQL、部署或合併。
 
 ## 已確認契約與本機 fixture 的區別
@@ -23,7 +23,9 @@
 - 重複請求、時區標準化、重複取消保留原 actor／reason；重複取消舊預約不會取消後來的新預約。
 - 取消已更新狀態後，故意讓 outbox 觸發器失敗：原狀態、稽核、通知、outbox 全部回滾。
 - 24 小時微秒邊界、原因、開始後拒絕；颱風待審／核驗／拒絕的歷史、統計與 RLS。
-- TRUNCATE 直接／PUBLIC／繼承來源與 global／schema default ACL；最小修正保留其他權限；未清除繼承來源則拒絕部分修正。
+- 確認的 postgres 直接授權與兩個建立者 default ACL 最小撤權；其他權限／維護角色與跨 schema 保持不變；未知 PUBLIC／父角色／global 來源拒絕部分修正。
+- 低權限操作者無權修改 supabase_admin 時整個 default 修正回滾；修正前 metadata 快照產生精確含 grant option 的回滾文字；實際還原比對完全相同。
+- 新表使用新預設、既有表不回溯改動；回滾 default 也不改修正期間的新表。
 - 完整草稿遇到繼承寫入權限時安裝失敗並回滾，不留下半套 schema。
 
 ## PostgreSQL 17 真正並行證據
@@ -52,4 +54,4 @@ npm run test:postgres
 
 ## 尚未完成的正式驗證
 
-未連 Supabase，也未取得新的正式 ACL grantor／繼承圖／default ACL 來源；不宣稱正式 TRUNCATE 已修復。未測正式 JWT/PostgREST、會員核准來源、付款／退款／核准回呼、通知外送、staging 安裝及高負載壓測。前端仍為 cs_ 原型，未改接新 RPC。這些須審查後另行實作／驗證，不因本次本機並行通過就解除啟用限制。
+最新正式來源已由使用者提供，無需再猜測 grantor／creator。本工作未連 Supabase、未執行正式修正，不宣稱正式 TRUNCATE 已修復。執行者對 supabase_admin default ACL 的實際授權與執行時來源漂移仍需在核准變更時確認。未測正式 JWT/PostgREST、會員核准來源、付款／退款／核准回呼、通知外送、staging 安裝及高負載壓測。前端仍為 cs_ 原型，未改接新 RPC。這些須審查後另行實作／驗證，不因本次本機並行通過就解除啟用限制。

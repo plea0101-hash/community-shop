@@ -30,3 +30,11 @@
 - [更新的測試報告與 PostgreSQL 並行測試重現方法](docs/production-booking-test-results.md)
 
 `npm test` 執行 Node/PGlite；`npm run test:postgres` 使用一次性、無網路 PostgreSQL 17 容器進行真正多連線測試，需先取得報告中固定 digest 的官方映像。
+
+已依最新正式 ACL 確認 postgres 直接授權、無角色繼承路徑，另有 postgres/supabase_admin 的 public default ACL 來源。修正仍僅供審查，未執行正式 SQL：
+
+- [兩階段執行順序、影響與回滾方案](docs/truncate-execution-plan.md)
+- [兩個建立者的 default ACL 最小修正草稿](sql/drafts/20261113_truncate_default_acl.sql)
+- [每一步前後使用的唯讀驗證與基線回滾 SQL 文字](sql/inspection/truncate_fix_verification.sql)
+
+兩份修正都保留 service_role/postgres 維護與非目標權限；default 變更不回溯影響其他既有表，也不解除應用會員／付款的拒絕預設。

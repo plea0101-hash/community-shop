@@ -1,38 +1,43 @@
-# TRUNCATE 來源分析與最小權限修正（僅草稿）
+# 已確認 ACL 的安全分析與最小修正（未執行正式 SQL）
 
-## 已知證據與邊界
+## 正式證據更新
 
-使用者的最新正式補查：bookings 的 anon/authenticated 有效 SELECT、INSERT、UPDATE=false，TRUNCATE=true。先前上傳的 table_grants 另列明兩個角色各有直接 TRUNCATE ACL。這可證明已有直接授權暴露，不足以排除同時存在的 PUBLIC、父角色、擁有權或其他來源；目前未取得最新 grantor、角色圖與 default ACL。**本工作沒有執行任何正式 SQL 或遠端探查。**
+來源為使用者提供的正式唯讀盤點，本工作沒有連線或查詢正式 Supabase：
 
-TRUNCATE 不透過 RLS，也不走一般逐列 DELETE policy。不能因 SELECT=false／RLS=true 就把該權限視為安全。直接 REVOKE 也不能消除另一個可繼承角色的授權；若角色為表擁有者或 superuser，更不能靠 REVOKE 普通 ACL 達成隔離。bypassrls 雖不等於取得 TRUNCATE，但表示不能依賴 RLS 的其他保護，應另外拒絕不安全客戶端角色。
+- anon/authenticated 對 public.bookings 有效 TRUNCATE=true，兩者都有 postgres 給的直接 TRUNCATE ACL。
+- bookings 擁有者 postgres；membership_paths 為空，未發現角色繼承來源。本次最小修正不撤銷 PUBLIC 或共享父角色，也不改擁有權。
+- public 的 per-schema default ACL：postgres、supabase_admin 各自建立的表，對 anon/authenticated/service_role 含 TRUNCATE。
+- 先前確認客戶端的 bookings SELECT/INSERT/UPDATE=false。不能因這些是 false 就認為 TRUNCATE 安全，RLS 不保護 TRUNCATE。
 
-## 只讀來源盤點
+因此目前有兩個獨立暴露面：現有 bookings 的直接授權，以及未來兩個建立者的 public 表預設授權。修正其中一個不會自動修正另一個。`membership_paths` 是 DB 角色圖，不是應用的社區／廠商會員資格；不能因此啟用未審核的預約授權。
 
-`sql/inspection/truncate_privilege_sources.sql` 是單一 metadata SELECT，預設只查 public.bookings：
+## 精確修改範圍
 
-- 每個客戶端的有效 TRUNCATE、角色旗標、owner 與 owner 繼承。
-- ACL grantor/grantee，分直接／PUBLIC／其他角色，並以 pg_has_role(...,'USAGE') 標明是否無需 SET ROLE 即生效。
-- 角色遞迴路徑、inherit_option、set_option；列出路徑不代表每條路徑都自動授權，以有效結果區分。
-- 實際建立者的 global／public schema default ACL，辨識未來建表再次授權的來源。
+1. `sql/drafts/20261113_truncate_minimum.sql`：只對 public.bookings 撤銷 anon/authenticated 的 TRUNCATE。不改 PUBLIC、其他表、DML、SELECT、RLS、role membership、owner，也不給任何新權限。
+2. `sql/drafts/20261113_truncate_default_acl.sql`：只對 postgres、supabase_admin 這兩個 creator，在 public 的 TABLES default ACL 撤銷 anon/authenticated 的 TRUNCATE。不改 service_role、擁有者、其他權限、其他 schema、其他 creator、global defaults、functions 或 sequences。
 
-不讀業務資料、Auth 使用者、金鑰、Vault、應用函式本文。這份查詢本次只在本機合成庫執行；留待使用者另行審查來源，不由代理連線正式庫執行。
+PostgreSQL 的 TABLES default ACL 依「建立者＋schema」套用，不能只依未來表名 bookings 篩選，且 table-like objects 如 views 也屬此類。此改動會讓兩個建立者未來在 public 建的此類物件不再預設給客戶端 TRUNCATE；**不會回溯改既有物件**。
 
-## 最小修正提案
+兩份腳本各自是短交易。現有表草稿會對比所有非目標 ACL（含 grantor、grant option）與 postgres/service_role 的有效維護權限，任何非目標差異即回滾；default ACL 草稿會對比全庫所有非目標 default ACL entries，保證沒有順手撤銷其他必要權限。
 
-`sql/drafts/20261113_truncate_minimum.sql` 只撤銷 **public.bookings 的 TRUNCATE**，對象限已知直接角色與 PUBLIC。不授予 SELECT/DML，不改 RLS，不刪資料，不撤銷角色成員、不使用 CASCADE，也不全域 REVOKE ALL。其後驗證有效權限；若仍 true 或角色不安全，整份交易拒絕並回滾，不能把部分直接撤銷稱為修復完成。
+## 來源漂移與權限不足
 
-若來源報告指出父角色仍授權，應另提「對該確定 grantee、只對 public.bookings 撤銷 TRUNCATE」的精確方案。若該角色共用，先確認其維護用途，不改整個角色繼承圖。若客戶端繼承表擁有權，需獨立檢討角色與擁有權，不能用 REVOKE 形式偽裝修好。
+雖然目前沒有繼承路徑，執行時若新出現 PUBLIC／父角色、owner 繼承或 superuser 等來源，現有表腳本會拒絕部分修正。default ACL 若仍有 global、PUBLIC 或可繼承來源，也拒絕。不能以 public schema 的 REVOKE 抵銷 global default GRANT，腳本不擅自修改 global 或共享角色。
 
-Default ACL 不會回溯修正現有表；現有表 REVOKE 也不會更改未來建表預設。須辨識實際 creator／grantee 與 global 或 per-schema 範圍後另提 ALTER DEFAULT PRIVILEGES 修正。**schema-specific REVOKE 無法抵銷 global default GRANT**；不應猜建立者、清空未知設定或自動改全域預設。此階段只提供來源證據查詢與方案，沒有執行 default ACL 修正。
+執行者必須同時有權修改兩個建立者的 default privileges。Supabase 可能限制修改 supabase_admin；如果被平台拒絕，該份交易整體回滾，需由平台授權操作者處理，不能自行提升角色、GRANT membership 或假裝完成。已提交的 bookings 修正不必因此恢復不安全權限。
 
-完整 RPC 草稿包含新稽核表保護、直接 DML 收斂與必要 SELECT/RPC grants，範圍比本最小修正大；兩者不是同一個核准事項。即使最小 TRUNCATE 修好，也不代表會員／付款流程可啟用。完整草稿遇到繼承的預約／會員／稽核寫入或維護權限，仍會拒絕安裝。
+## 保留維護權限及應用限制
 
-## 本機測試證據
+腳本不以 service_role/postgres 為撤權對象；bookings owner 不變，service_role 原有 table ACL／default ACL 與 grant options 均保留。本機以額外必要權限作 sentinel 驗證未受影響，不假設正式所有其他 privileges 都是 ALL。
 
-3 項獨立測試通過：
+修正後普通客戶端 TRUNCATE 應失敗，這是預期效果。正常預約、取消、庫存原子操作不依賴客戶端 TRUNCATE；本機在套用修正後驗證兩個建立者新表及六個真實並行預約場景。會員／付款的拒絕預設沒有解除，沒有安裝正式 RPC 或改接前端。
 
-1. 直接與 PUBLIC ACL 來源被辨識；在 RLS 開啟、anon 無 SELECT 的本機庫，TRUNCATE 可成功而後 ROLLBACK 恢復合成資料；最小草稿修正後 TRUNCATE=false，原 REFERENCES 及 SELECT 權限不被改動。
-2. 父角色仍給 TRUNCATE 時，顯示繼承路徑；最小草稿拒絕部分修正並回滾。
-3. global 與 per-schema default ACL 都被列出；即使現有 bookings 修正，新的合成表仍會因原 default ACL 再次取得 TRUNCATE，證明需獨立處理未來授權。
+這只修 TRUNCATE；其他既有表可能仍暴露，其他 creator／schema 不在修正範圍。保留的其他 default SELECT/DML 也不代表新表自動具有合適的 RLS，須另行審查，不在此擴大撤權。
 
-實際正式來源、預設授權建立者與其他共享角色尚未檢視；不宣稱正式風險已修復。
+## 驗證與回滾
+
+完整步驟、兩階段預期結果與回滾順序見 [truncate-execution-plan.md](truncate-execution-plan.md)。`truncate_fix_verification.sql` 同一個唯讀 SELECT 可在每一步前後執行，應保留修正前完整 JSON；其中會從實際 ACL 產生回滾 SQL 字串，包含真實 grant option／grantor，而不執行它們。
+
+`sql/rollback/` 提供已知 no-GRANT-OPTION 基線的危險回滾草稿；若保存的基線不同，以修正前 JSON 的精確授權為準，先審查再執行。回滾會重新引入安全暴露，不應作為預約功能出問題時的預設補救。default rollback 不回溯改修正期間已建立的表。
+
+本機 7 項 ACL 測試及真正 PostgreSQL 的快照回滾／預約回歸均已驗證；沒有修改任何正式資料或權限，不宣稱正式漏洞已排除。

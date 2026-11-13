@@ -1,6 +1,6 @@
 """Real multi-session PostgreSQL tests, synthetic data only, network-disabled container."""
 from pathlib import Path
-import os, subprocess, time, uuid, selectors
+import os, subprocess, time, uuid, selectors, json
 
 ROOT=Path(__file__).resolve().parents[1]
 IMAGE='postgres@sha256:40865bc877a289da75963d97d72b59633f639fc5af7a4e856bfa3714cae5b536'
@@ -68,6 +68,33 @@ try:
         time.sleep(.05)
     else:raise AssertionError('local PostgreSQL not ready')
     query((ROOT/'tests/fixtures/production-booking.sql').read_text())
+    query((ROOT/'tests/fixtures/truncate-acl.sql').read_text())
+    verification=(ROOT/'sql/inspection/truncate_fix_verification.sql').read_text()
+    before=json.loads(query(verification).stdout)
+    assert not before['checks']['bookings_clients_cannot_truncate']
+    query((ROOT/'sql/drafts/20261113_truncate_minimum.sql').read_text())
+    query((ROOT/'sql/drafts/20261113_truncate_default_acl.sql').read_text())
+    after=json.loads(query(verification).stdout)
+    assert after['checks']['bookings_clients_cannot_truncate'] and after['checks']['future_public_client_truncate_sources_absent']
+    maintenance=lambda d:[p for p in d['effective_permissions'] if p['role'] in ('postgres','service_role')]
+    assert maintenance(after)==maintenance(before)
+    query('CREATE TABLE acl_future_pg(id int); SET ROLE supabase_admin; CREATE TABLE public.acl_future_admin(id int); RESET ROLE;')
+    for table in ['acl_future_pg','acl_future_admin']:
+        for role in ['anon','authenticated']:
+            assert query(f"SELECT has_table_privilege('{role}','{table}','TRUNCATE');").stdout.strip()=='f'
+        assert query(f"SELECT has_table_privilege('service_role','{table}','TRUNCATE');").stdout.strip()=='t'
+    print('PASS ACL preflight: both fixes verified, maintenance unchanged, both creators future tables deny client TRUNCATE',flush=True)
+    for r in before['rollback_from_snapshot']['defaults']:
+        query(r['sql'])
+    for r in before['rollback_from_snapshot']['bookings']:
+        assert r['run_as_grantor']=='postgres'
+        query(r['sql'])
+    assert json.loads(query(verification).stdout)==before
+    for table in ['acl_future_pg','acl_future_admin']:
+        assert query(f"SELECT has_table_privilege('anon','{table}','TRUNCATE');").stdout.strip()=='f'
+    query((ROOT/'sql/drafts/20261113_truncate_minimum.sql').read_text())
+    query((ROOT/'sql/drafts/20261113_truncate_default_acl.sql').read_text())
+    print('PASS ACL rollback: saved baseline restored exactly; no retroactive grant to intervening tables; fixes re-applied locally',flush=True)
     query((ROOT/'sql/drafts/20261113_production_booking_rpcs.sql').read_text())
     query(f"INSERT INTO booking_brand_members VALUES(1,'{V}',true);INSERT INTO booking_community_members VALUES(1,'{C}',true);")
     denied=query(actor_sql()+request_sql(1),ok=False)

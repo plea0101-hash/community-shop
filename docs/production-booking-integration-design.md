@@ -29,7 +29,7 @@
 
 ## 3. 權限與現有風險
 
-bookings RLS 目前只有平台管理員 ALL policy，沒有廠商／社區會員 policy。表級 ACL 中 anon/authenticated 沒有 SELECT/INSERT/UPDATE/DELETE，卻有 TRUNCATE、TRIGGER、REFERENCES、MAINTAIN。**TRUNCATE 不受 RLS 保護，不能因 anon 無 SELECT 就判定資料安全。** 後續補查確認 anon/authenticated 的 SELECT、INSERT、UPDATE 有效值 false，TRUNCATE true。先前 ACL 已列直接授權；是否另有 PUBLIC／父角色路徑、授權人及 default ACL 則仍未提供。本階段不查詢正式庫、不試做破壞性操作，詳細來源分析與最小修正見 [truncate-privilege-review.md](truncate-privilege-review.md)。
+bookings RLS 目前只有平台管理員 ALL policy，沒有廠商／社區會員 policy。表級 ACL 中 anon/authenticated 沒有 SELECT/INSERT/UPDATE/DELETE，卻有 TRUNCATE、TRIGGER、REFERENCES、MAINTAIN。**TRUNCATE 不受 RLS 保護，不能因 anon 無 SELECT 就判定資料安全。** 後續來源盤點已確認：anon/authenticated 的 SELECT、INSERT、UPDATE 有效值 false，TRUNCATE true；兩個直接授權者皆 postgres、bookings owner=postgres、membership_paths 空；postgres/supabase_admin 的 public default ACL 對 anon/authenticated/service_role 皆含 TRUNCATE。本階段不查詢正式庫、不試做破壞性操作，詳細來源分析與最小修正見 [truncate-privilege-review.md](truncate-privilege-review.md)。
 
 本 schema 沒有 brands／communities 對 Auth 使用者的正式會員關係。因此草稿提議增加 `booking_brand_members`／`booking_community_members`，只保存已經受信任審核的組織授權，普通使用者無讀寫或自助加入權限。若其他私有 schema 已有相應關係，正式版應改接既有來源，不能重複建立兩套會員權限。
 
@@ -68,17 +68,17 @@ bookings RLS 目前只有平台管理員 ALL policy，沒有廠商／社區會�
 
 ## 5. 尚需補齊，不可直接啟用
 
-1. active 狀態、[) 邊界、時間 CHECK 及四表預設值已確認，不再重複索取。仍需審查品牌／社區資格狀態、取消終態與具體會員授權流程；來源查詢 `sql/inspection/truncate_privilege_sources.sql` 僅供之後由使用者自行檢閱／執行，不由本工作連線正式庫。
+1. active 狀態、[) 邊界、時間 CHECK 及四表預設值已確認，不再重複索取。仍需審查品牌／社區資格狀態、取消終態與具體會員授權流程；來源已由使用者提供，現階段僅更新草稿；正式修正前後對比使用 `sql/inspection/truncate_fix_verification.sql`，本工作不連線正式庫。
 2. 提供經人工去識別化的 get_booked_slots、is_platform_admin 本文，以及其他 schema 是否已有組織會員；不需要 key 或真實使用者資料。`community_registrations.owner_id` 不能直接接 community bigint。
 3. 確認未列在此公開 schema 的實際核准、付款、退款、排程及後台 DML 來源。草稿只建立待審／占位狀態，沒有核准／付款／退款 RPC；確認前不得因撤銷直接 DML 而中斷既有管理流程。
 4. 社區重新申請目前採「由原廠商重新提出」；若要社區發邀請，另設不占位的邀請資料及廠商同意流程，不能直接建立已同意預約。
-5. 會員配置、通知 worker、實際 Supabase Auth/PostgREST、付款回呼及 staging 驗證仍未完成。本機真正 PostgreSQL 多連線競爭已有 6 個場景通過；這不替代正式環境服務流程驗證。資料庫安裝、配置、舊 UI 改接新 RPC、部署分別需要後續確認，不能因本機測試通過就啟用。
+5. 會員配置、通知 worker、實際 Supabase Auth/PostgREST、付款回呼及 staging 驗證仍未完成。本機已在套用現有表與兩個建立者 default ACL 修正後，驗證維護權限／精確回滾及 6 個真正 PostgreSQL 多連線場景；這不替代正式環境服務流程驗證。資料庫安裝、配置、舊 UI 改接新 RPC、部署分別需要後續確認，不能因本機測試通過就啟用。
 
 ## 6. 測試範圍
 
 `tests/production-booking.test.js` 以收到的 bigint/FK/timestamptz/time CHECK／GiST 結構建立一次性 PGlite PostgreSQL，並使用 btree_gist；active=pending/confirmed、建立 pending、四表預設及 [) 已確認。所有身分、聯絡欄位及測試預約均合成。資格 approved、取消終態 cancelled、會員配置與審查開關 true 仍只是受控本機 fixture，不代表正式審查已完成。
 
-新增涵蓋會員／付款未審的三種寫入拒絕、重複取消不改原原因且不釋放替代預約、取消中途 outbox 失敗整體回滾、預設值／CHECK 漂移拒絕、pending 不自動合格。`tests/truncate-privileges.test.js` 驗證直接／PUBLIC／繼承及全域／schema default ACL，並在可回滾的本機合成交易證明 RLS 不防護 TRUNCATE。
+新增涵蓋會員／付款未審的三種寫入拒絕、重複取消不改原原因且不釋放替代預約、取消中途 outbox 失敗整體回滾、預設值／CHECK 漂移拒絕、pending 不自動合格。`tests/truncate-privileges.test.js` 的 7 項測試以確認的兩個建立者與維護角色驗證最小修正、非目標權限、未來／既有表差異、拒絕未知額外來源、低權限失敗原子回滾，以及精確含 grant option 的基線還原；另在本機合成交易證明 RLS 不防護 TRUNCATE。
 
 `tests/postgres_concurrency.py` 在固定官方映像 digest 的 PostgreSQL 17.12 容器，以獨立 psql 連線及 pg_blocking_pids 證明競爭等待，驗證六個場景：同時重疊預約、相同請求 key、雙方重複取消、建立回滾後另一方取得時段、取消回滾後仍占位、取消與重新申請競爭。容器 network=none、listen_addresses 空、無公開埠、資料在 tmpfs，結束移除；不連 Supabase。
 
