@@ -51,3 +51,5 @@
 ## 階段 A 正式變更申請（僅備件，未核准／未執行）
 
 集中審查入口：[階段 A 核准申請表](docs/stage-a-change-approval.md)，包含責任／時段／基線／驗收／回滾核准欄位、指定 SQL 版本及所有連結；另附 [逐步檢查清單](docs/stage-a-execution-checklist.md)。所有簽認與實際結果待填，填表或 PR 通過均不授權 Codex 執行正式 SQL，B 維持 blocked。
+
+階段 A 文件已依使用者聲明改為單人專案：本人兼任所有本案人工責任，各項決議／時間／證據／簽認分開；ChatGPT／Codex 不是獨立人工審查。適用的正式獨立人員要求若存在，仍未滿足、不能自行豁免。這只是責任配置更新，不是變更核准；詳見 [申請表第 0 節與分項紀錄](docs/stage-a-change-approval.md)。

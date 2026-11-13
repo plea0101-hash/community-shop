@@ -70,3 +70,9 @@ npm run test:postgres
 本輪僅新增／串接申請表及檢查清單，沒有 SQL／程式／測試檔變更。核對指定修正、唯讀驗證、預檢、A 回滾檔與 metadata 基線的 SHA-256，檢查本機文件連結、目標 grantee／privilege、原 grantor／grant option 及 service_role 四個 false；`git diff --check` 通過。沒有執行任何 SQL，也沒有重跑功能測試；40 項及 PostgreSQL 6 個場景仍為先前本機證據。
 
 核准申請與實際結果仍待填，詳見 [stage-a-change-approval.md](stage-a-change-approval.md)。正式資料庫未修復，文件不構成批准。
+
+## 單人管理文件更新（本輪）
+
+本輪僅調整 Markdown：已知角色統一為同一位專案負責人本人，但申請／核准／自行複核／操作／驗收／風險接受／異常／回滾的決議、時間與簽認分開，不代填批准或結果，不虛構其他人。AI 技術輔助不當成獨立人工審核；如有適用的不同人員強制要求，仍未滿足，不自行豁免。
+
+靜態核對申請表的 SQL／基線 SHA-256 及文件連結，確認未勾選完成紀錄；diff 檢查通過。SQL、程式、測試檔未改，未執行任何 SQL或重跑功能測試；先前 40 項與 PostgreSQL 6 個場景僅為歷史本機證據，正式仍未核准／未執行。
