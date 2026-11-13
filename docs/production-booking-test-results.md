@@ -64,3 +64,9 @@ npm run test:postgres
 依使用者限制，本輪只更新文件與草稿註記。靜態比對確認兩份修正 SQL 的非註解內容與上一版完全相同；未拆成 postgres-only defaults、未新增 GRANT／SET ROLE／提權或自動執行器。`git diff --check` 通過。沒有重新執行 SQL 功能測試；上述 40 項與 PostgreSQL 6 個場景是前輪本機證據，不是本輪或正式執行結果。
 
 最新執行限制、部分修正風險與獨立核准清單見 [truncate-execution-restrictions.md](truncate-execution-restrictions.md)。
+
+## 階段 A 變更申請文件準備（本輪）
+
+本輪僅新增／串接申請表及檢查清單，沒有 SQL／程式／測試檔變更。核對指定修正、唯讀驗證、預檢、A 回滾檔與 metadata 基線的 SHA-256，檢查本機文件連結、目標 grantee／privilege、原 grantor／grant option 及 service_role 四個 false；`git diff --check` 通過。沒有執行任何 SQL，也沒有重跑功能測試；40 項及 PostgreSQL 6 個場景仍為先前本機證據。
+
+核准申請與實際結果仍待填，詳見 [stage-a-change-approval.md](stage-a-change-approval.md)。正式資料庫未修復，文件不構成批准。

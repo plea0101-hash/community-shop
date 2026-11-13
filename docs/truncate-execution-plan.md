@@ -2,6 +2,8 @@
 
 **目前僅文件與草稿更新，Codex 不得執行任何正式 SQL、不得自動拆開 SQL 執行，也不得自行授予 supabase_admin 權限。** 最新預檢顯示 postgres 符合現有 bookings 表級修正權限條件，但對 supabase_admin defaults 的 MEMBER/USAGE/SET/candidate 全 false，因此完整 default 草稿目前 blocked。現有表也尚未取得正式變更核准、尚未執行。以 [最新執行限制](truncate-execution-restrictions.md) 為準。
 
+階段 A 正式審查請先使用 [核准申請表與集中連結](stage-a-change-approval.md) 及 [逐步檢查清單](stage-a-execution-checklist.md)；它們只是待填備件，不代表批准本計畫或執行任何階段。
+
 ## 待核准的三個目標 DCL（不是自動執行清單）
 
 現有 bookings：

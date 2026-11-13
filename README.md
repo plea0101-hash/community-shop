@@ -47,3 +47,7 @@
 - [最新正式執行限制、分階段核准與 supabase_admin 授權途徑](docs/truncate-execution-restrictions.md)
 
 最新預檢：postgres 具備 bookings 表級修正權限條件，但未核准／未執行；對 supabase_admin defaults 的角色權限證據為否，完整 default 修正受阻。Codex 不自動拆 SQL 執行，不自行 SET ROLE／GRANT membership／提權；A 若需先處理，須獨立正式核准，不包含 B。
+
+## 階段 A 正式變更申請（僅備件，未核准／未執行）
+
+集中審查入口：[階段 A 核准申請表](docs/stage-a-change-approval.md)，包含責任／時段／基線／驗收／回滾核准欄位、指定 SQL 版本及所有連結；另附 [逐步檢查清單](docs/stage-a-execution-checklist.md)。所有簽認與實際結果待填，填表或 PR 通過均不授權 Codex 執行正式 SQL，B 維持 blocked。

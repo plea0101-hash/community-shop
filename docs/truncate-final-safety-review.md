@@ -67,3 +67,7 @@ Codex 不自動 SET ROLE、GRANT membership 或提權；不以「先跑 postgres
 應用的會員／付款／退款／核准回呼、通知 worker、前端改接仍是另案啟用前提；不能為了讓 service_role 直接操作預約而在本次順便補 DML。ACL 修正也不回溯清理其他既有表的 TRUNCATE，其他權限與來源須另行審查。
 
 操作順序與影響見 [truncate-execution-plan.md](truncate-execution-plan.md)，完整本機結果見 [production-booking-test-results.md](production-booking-test-results.md)。
+
+## 階段 A 核准文件準備狀態
+
+已產出 [階段 A 申請表](stage-a-change-approval.md) 與 [執行前／驗收／異常清單](stage-a-execution-checklist.md)。尚缺實際操作者、窗口、正式核准、最新正式基線、回滾與驗收責任及 B 風險接受。沒有代填簽名、結果或時段；備件完成不等於正式核准／修復。

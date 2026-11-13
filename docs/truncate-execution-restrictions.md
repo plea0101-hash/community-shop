@@ -62,3 +62,7 @@ service_role 對 bookings 的 SELECT/INSERT/UPDATE/DELETE **仍須全部 false**
 3. 平台對 supabase_admin defaults 的可修改性、獲授權操作者及管道；目前 postgres 不具備該證據。
 4. B 整份草稿的獨立核准；不可用 A 的核准或本機結果替代。
 5. 各階段真正完成後的正式唯讀結果，才能更新修復狀態。
+
+## 階段 A 申請備件（不改授權狀態）
+
+已備妥 [正式變更申請與集中連結](stage-a-change-approval.md) 及 [檢查清單](stage-a-execution-checklist.md)。操作者／時段／核准人／最新基線／風險接受／驗收／回滾責任均待填；本輪只準備文件，A 仍未核准未執行，B 仍 blocked，不自動拆 SQL、授權或執行。
