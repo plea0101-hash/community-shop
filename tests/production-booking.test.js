@@ -176,4 +176,15 @@ test('confirmed defaults and time CHECK detect drift; pending is not eligibility
  await as(V);await assert.rejects(request(14),/community_not_eligible/);
  await owner();await db.exec("UPDATE communities SET status='approved' WHERE id=1");
 });
+
+
+test('legacy permissive SELECT cannot bypass unreviewed membership or expose another party booking',async()=>{
+ await config();await owner();await db.exec('CREATE POLICY synthetic_legacy_open ON bookings FOR SELECT TO authenticated USING(true)');
+ try {
+  await as(X);assert.equal((await db.query('SELECT * FROM bookings')).rows.length,0);
+  await owner();await db.exec('UPDATE booking_workflow_config SET membership_reviewed=false');
+  await as(V);assert.equal((await db.query('SELECT * FROM bookings')).rows.length,0);
+  await as(C);assert.equal((await db.query('SELECT * FROM bookings')).rows.length,0);
+ } finally {await config();await db.exec('DROP POLICY synthetic_legacy_open ON bookings');}
+});
 after(async()=>db.close());

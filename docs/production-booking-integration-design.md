@@ -52,7 +52,7 @@ bookings RLS 目前只有平台管理員 ALL policy，沒有廠商／社區會�
 
 ### 工作流程配置不等於第二套庫存
 
-`booking_workflow_config` 保存工作流程代碼與兩個審查開關。已確認 active_states=[pending,confirmed]、create_state=pending、venue_state=available，並用 CHECK 固定；brand_state/community_state 資格代碼及 cancelled_state 仍為 NULL，membership_reviewed/payment_reviewed 仍為 false，因此所有建立／取消／重新申請均預設拒絕。只有受信任 DB 管理流程可以配置。會員審查為 false 時，品牌／社區會員 helper 與 RLS 亦拒絕，不能只靠事先插入 can_manage=true 的會員資料就開放讀取；颱風查核 RPC 也先檢查啟用契約。不能只因建立會員資料或填入狀態就繞過會員／付款審查；測試才在一次性資料庫明確設為 true。執行時驗證實際排他約束的狀態 predicate、=／&& 操作符及 [) range 形式完全相符。這是防止錯誤啟用的契約檢查，**不是自動判斷品牌已核准、退款或上線核准**。
+`booking_workflow_config` 保存工作流程代碼與兩個審查開關。已確認 active_states=[pending,confirmed]、create_state=pending、venue_state=available，並用 CHECK 固定；brand_state/community_state 資格代碼及 cancelled_state 仍為 NULL，membership_reviewed/payment_reviewed 仍為 false，因此所有建立／取消／重新申請均預設拒絕。只有受信任 DB 管理流程可以配置。新增 restrictive SELECT guard，將既有 permissive policy 的 OR 結果再限縮至伺服器核驗的管理員／會員；不依賴未審查舊 policy 自行正確隔離。會員審查為 false 時，品牌／社區會員 helper 與 RLS 亦拒絕，不能只靠事先插入 can_manage=true 的會員資料就開放讀取；颱風查核 RPC 也先檢查啟用契約。不能只因建立會員資料或填入狀態就繞過會員／付款審查；測試才在一次性資料庫明確設為 true。執行時驗證實際排他約束的狀態 predicate、=／&& 操作符及 [) range 形式完全相符。這是防止錯誤啟用的契約檢查，**不是自動判斷品牌已核准、退款或上線核准**。
 
 ### 鎖與冪等性
 

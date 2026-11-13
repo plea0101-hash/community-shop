@@ -250,6 +250,9 @@ ALTER TABLE public.booking_cancellation_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.booking_cancellation_reviews ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.booking_event_notifications ENABLE ROW LEVEL SECURITY;
 CREATE POLICY booking_participant_read ON public.bookings FOR SELECT TO authenticated USING(public.booking_can_read(id));
+-- Existing permissive policies combine with OR; do not let an unreviewed legacy
+-- policy bypass the membership gate or expand the new participant SELECT grant.
+CREATE POLICY booking_participant_guard ON public.bookings AS RESTRICTIVE FOR SELECT TO authenticated USING(public.booking_can_read(id));
 CREATE POLICY booking_event_read ON public.booking_cancellation_events FOR SELECT TO authenticated USING(public.booking_can_read(booking_id));
 CREATE POLICY booking_review_read ON public.booking_cancellation_reviews FOR SELECT TO authenticated USING(EXISTS(SELECT 1 FROM public.booking_cancellation_events e WHERE e.id=event_id));
 CREATE POLICY booking_notification_read ON public.booking_event_notifications FOR SELECT TO authenticated USING(recipient_id=auth.uid());

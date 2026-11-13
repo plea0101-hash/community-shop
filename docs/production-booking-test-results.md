@@ -4,7 +4,7 @@
 
 ## 結果
 
-- `npm test`：**33 通過、0 失敗、0 跳過**。15 項正式 bookings 測試、3 項 TRUNCATE 來源／最小修正測試，以及保留的 15 項原型／領域／API 測試。
+- `npm test`：**34 通過、0 失敗、0 跳過**。16 項正式 bookings 測試、3 項 TRUNCATE 來源／最小修正測試，以及保留的 15 項原型／領域／API 測試。
 - `npm run test:postgres`：**6 個真正多連線競爭場景全部通過**；另驗證未配置 RPC 拒絕與 anon/authenticated TRUNCATE 拒絕。實測 PostgreSQL **17.12 (Debian 17.12-1.pgdg12+1)**，非 PGlite 的模擬並行。
 - `git diff --check`：通過。首頁、config.js 與 cancellation/ 前端未變；沒有正式 SQL、部署或合併。
 
@@ -18,7 +18,7 @@
 
 - 契約缺漏、預設／時間 CHECK／range 漂移時拒絕；pending 不被當成資格核准。
 - 會員或付款尚未審查時，建立、取消、重新申請都拒絕，沒有副作用；會員未審查時亦不能僅憑事先插入的會員資料經 RLS 讀取預約。
-- 禁止直接 DML、TRUNCATE、私有 helper 呼叫；陌生人隔離；管理員不冒名代取消。
+- 禁止直接 DML、TRUNCATE、私有 helper 呼叫；陌生人隔離；管理員不冒名代取消。新增 restrictive guard，驗證即使既有 permissive SELECT policy 意外允許全部，也不繞過未審會員或跨組織隔離。
 - 真正 btree_gist/GiST 排他約束的部分／包含重疊拒絕，相鄰／異場地允許；取消後可用原時段建立新 ID。
 - 重複請求、時區標準化、重複取消保留原 actor／reason；重複取消舊預約不會取消後來的新預約。
 - 取消已更新狀態後，故意讓 outbox 觸發器失敗：原狀態、稽核、通知、outbox 全部回滾。
