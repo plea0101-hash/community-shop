@@ -86,7 +86,7 @@
 | venue_availability_windows | 場地、開放起訖、發布狀態／時間／決定者；是供給規則，**不是第二套庫存或 booking holds** |
 | community_private_profiles | 詳細地址／聯絡資料最小集合、查閱授權／稽核；不放公開 projection，具體欄位依上午規格及隱私需求確認 |
 | booking_terms / booking_fulfillments | 原約定場地費、費率／政策版本、公司／品牌／實際分店、完成認定／爭議。不可用 mutable venues.fee 回算舊帳，或只用 end_time 代替完成 |
-| fee_policy_versions / statement_lines / community_statements | 逐案10%／最低100／免費例外、週期、應收／due_at、每案去重與調整追溯；每筆服務費無條件進位至整數元已確認；基數、稅額、生效點、週期仍待確認 |
+| fee_policy_versions / statement_lines / community_statements | 逐案10%／最低100／免費例外、週期、應收／due_at、每案去重與調整追溯；每筆服務費無條件進位至整數元已確認；上一完整週一至週日（Asia/Taipei）已確認；基數、稅額、生效點、執行／付款時刻與完成認定仍待確認 |
 | platform_fee_receipts / allocations | 社區向平台的線下付款、人工確認、分配到應收與餘額；不代收廠商場地費、不自動退款 |
 | publishing_eligibility（可即時計算） | 由應收餘額／期限導出只擋新發布的結果；若快取，非第二本帳，須可重建與有稽核 |
 | cancellation／typhoon／credit／notification | 優先修訂既有正式 bookings 附屬草稿，不另起 cs_ 庫存；事件／判定／申訴／對方與帳款通知，送達不等於入庫 |
@@ -103,4 +103,4 @@
 
 ## 6. 需確認後才能定稿的部分
 
-[商業規格第6節](business-rules-2026-11-13.md) 的 Q 項為待決清單，尤其上午原文、週期／截止時點、完成與退款／付款例外、公司／分店跨統編關係、私密資料授權及區間端點。新提供的規則以外，不在本輪自訂處罰／賠償／期限或放寬既有安全限制。
+[商業規格第6節](business-rules-2026-11-13.md) 的 Q 項為待決清單，尤其上午原文、結算執行／付款截止時點、完成與退款／付款例外、公司／分店跨統編關係、私密資料授權及區間端點。新提供的規則以外，不在本輪自訂處罰／賠償／期限或放寬既有安全限制。
