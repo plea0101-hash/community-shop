@@ -89,3 +89,7 @@ bookings RLS 目前只有平台管理員 ALL policy，沒有廠商／社區會�
 ## 最新正式執行限制（使用者已補執行者結果）
 
 postgres=bookings owner、owner privilege／grant option=true，具備表級修正的權限條件，但未核准且未執行；它不是 superuser，對 supabase_admin 的 MEMBER/USAGE/SET/candidate 全 false，完整 default ACL 修正受阻。可供決策的階段 A 須獨立正式核准，由正式操作者處理；Codex 不自動拆 SQL 執行、不跑 postgres-only default 段、不 SET ROLE、不授予角色。權威狀態與平台處理途徑見 [truncate-execution-restrictions.md](truncate-execution-restrictions.md)。
+
+## 11/13 新商業規格的規劃影響（未修改 SQL）
+
+新增統編／公司／總部與實際分店、公開檔期與戶數隱私、線下場地付款、10%逐筆最低／週結／逾期只擋新發布等需求，依 [新商規集中入口](requirements-2026-11-13-index.md) 另行設計。既有 RPC 的 branch 缺失、brand-level 會員來源與 payment_reviewed 語義需修訂方案，但本輪沒有改動或啟用；不把「無線上金流」當成解除線下付款例外／會員審查的理由。public.bookings 唯一庫存、A/B限制、已存簽認／證據全部保留。此補充不是正式執行或實作授權。
