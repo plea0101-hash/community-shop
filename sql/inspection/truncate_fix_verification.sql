@@ -24,6 +24,7 @@ SELECT jsonb_build_object(
  'defaults',COALESCE((SELECT jsonb_agg(jsonb_build_object('creator',pg_catalog.pg_get_userbyid(defaclrole),'grantor',pg_catalog.pg_get_userbyid(grantor),'sql',format('ALTER DEFAULT PRIVILEGES FOR ROLE %I IN SCHEMA public GRANT TRUNCATE ON TABLES TO %I%s;',pg_catalog.pg_get_userbyid(defaclrole),pg_catalog.pg_get_userbyid(grantee),CASE WHEN is_grantable THEN ' WITH GRANT OPTION' ELSE '' END)) ORDER BY defaclrole,grantee) FROM default_acl WHERE defaclnamespace='public'::regnamespace::oid AND grantee IN ('anon'::regrole::oid,'authenticated'::regrole::oid) AND privilege_type='TRUNCATE'),'[]'::jsonb)
  ),
  'checks',jsonb_build_object(
+ 'service_role_bookings_dml_still_absent',NOT EXISTS(SELECT 1 FROM unnest(ARRAY['SELECT','INSERT','UPDATE','DELETE']) p WHERE pg_catalog.has_table_privilege('service_role','public.bookings',p)),
  'bookings_clients_cannot_truncate',NOT EXISTS(SELECT 1 FROM clients WHERE pg_catalog.has_table_privilege(oid,'public.bookings','TRUNCATE')),
  'both_creators_present',(SELECT count(*)=2 FROM creators),
  'maintenance_roles_present',(SELECT count(*)=2 FROM pg_catalog.pg_roles WHERE rolname IN ('postgres','service_role')),

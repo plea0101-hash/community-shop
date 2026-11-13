@@ -21,6 +21,12 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public
 
 正式操作應使用包含前後斷言與回滾保護的草稿檔，不只執行以上摘錄。它們不含對 service_role/postgres 的撤權，也不需要執行完整預約 RPC migration。
 
+## 正式執行者確認（本工作不在正式庫執行）
+
+使用 `sql/inspection/truncate_executor_preflight.sql` 在真正擬執行的連線／active role 下做另行核准的唯讀確認。檢查 current_user、session_user、owner 可用權限與對兩個 creator 的 MEMBER/USAGE/SET 差異。catalog candidate=true 不等於 Supabase 平台已授權修改 supabase_admin；須由平台／專案管理者確認，不以正式 DCL 後 ROLLBACK 試權、不自行提權或自動 SET ROLE。候選結果不足時，停止而非授予更多角色。
+
+目前已收到的是修正前 ACL，不是執行者授權證明，也不是修正後結果。結論與檢查清單見 [truncate-final-safety-review.md](truncate-final-safety-review.md)。
+
 ## 執行順序
 
 | 順序 | 待核准操作 | 預期結果／確認 |
@@ -40,7 +46,7 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public
 
 - `bookings_owner`、`bookings_rls`：全程相同。
 - `bookings_acl`：步驟 2 後只移除兩個指定 grantee 的 TRUNCATE；其餘 grantor、privilege、grantable 必須相同。
-- `effective_permissions`：客戶端 TRUNCATE 由 true 變 false；其原 SELECT/INSERT/UPDATE=false 不變。postgres/service_role 的每一項有效權限均與基線相同，不以「應該有」代替對比。
+- `effective_permissions`：客戶端 TRUNCATE 由 true 變 false；其原 SELECT/INSERT/UPDATE=false 不變。postgres/service_role 的每一項有效權限均與基線相同，特別是 service_role 的 SELECT/INSERT/UPDATE/DELETE 必須仍為 false，不得為方便而補上。新增 service_role_bookings_dml_still_absent 應保持 true。
 - `default_acl`：步驟 4 後只移除兩個 creator 在 public 給兩個客戶端的 TRUNCATE。global／service_role／其他 privilege 不變。
 - `checks.future_public_client_truncate_sources_absent`：應在 default 修正後 true；它驗證 metadata 的來源，不假裝在正式庫試建表。
 - `rollback_from_snapshot`：從當次實際 ACL 產生 GRANT SQL 文字，保留 grant option。**必須保存修正前輸出**，修正後相關 entries 已不存在，不能再從修正後結果推回基線。

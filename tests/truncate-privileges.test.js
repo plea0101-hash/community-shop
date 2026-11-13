@@ -90,3 +90,29 @@ test('saved read-only baseline generates exact rollback including grant options 
   assert.deepEqual(await report(db),baseline);
  }finally{await db.close();}
 });
+
+test('local fixture exactly matches all supplied pre-fix ACL and effective permission bits, including absent service DML',async()=>{
+ const db=await fresh();try {
+  const expected=JSON.parse(await read('./fixtures/truncate-baseline.json'));const actual=await report(db);
+  const canonical=rows=>rows.map(r=>JSON.stringify(r,Object.keys(r).sort())).sort();
+  assert.equal(actual.bookings_owner,expected.bookings_owner);assert.deepEqual(actual.bookings_rls,expected.bookings_rls);
+  for(const field of ['bookings_acl','default_acl','effective_permissions'])assert.deepEqual(canonical(actual[field]),canonical(expected[field]));
+  assert.equal(actual.checks.bookings_clients_cannot_truncate,false);assert.equal(actual.checks.future_public_client_truncate_sources_absent,false);
+  assert.equal(actual.checks.service_role_bookings_dml_still_absent,true);
+  await db.exec(minimum);await db.exec(defaults);const after=await report(db);
+  assert.deepEqual(maintenance(after),maintenance(actual));assert.equal(after.checks.service_role_bookings_dml_still_absent,true);
+  for(const p of ['SELECT','INSERT','UPDATE','DELETE'])assert.equal(after.effective_permissions.find(x=>x.role==='service_role'&&x.privilege===p).allowed,false);
+ }finally{await db.close();}
+});
+test('executor preflight distinguishes inherited authority from mere SET ROLE eligibility and never proves managed platform permission',async()=>{
+ const db=await fresh();try{
+  const sql=await read('../sql/inspection/truncate_executor_preflight.sql');
+  const root=await report(db,sql);assert.equal(root.catalog_estimate_only,true);assert.equal(root.managed_platform_authorization_still_required,true);assert.equal(root.production_dcl_probe_authorized,false);
+  await db.exec('CREATE ROLE reviewing_operator; GRANT postgres TO reviewing_operator; SET ROLE reviewing_operator');
+  const limited=await report(db,sql);assert.equal(limited.creator_authority.find(c=>c.creator==='postgres').current_identity_catalog_candidate,true);assert.equal(limited.creator_authority.find(c=>c.creator==='supabase_admin').current_identity_catalog_candidate,false);
+  await db.exec('RESET ROLE; CREATE ROLE can_set_only NOINHERIT; GRANT supabase_admin TO can_set_only; SET ROLE can_set_only');
+  const setOnly=await report(db,sql);const c=setOnly.creator_authority.find(c=>c.creator==='supabase_admin');
+  assert.equal(c.member,true);assert.equal(c.set_role_allowed_by_catalog,true);assert.equal(c.usable_without_set_role,false);assert.equal(c.current_identity_catalog_candidate,false);
+  await db.exec('RESET ROLE');
+ }finally{await db.close();}
+});

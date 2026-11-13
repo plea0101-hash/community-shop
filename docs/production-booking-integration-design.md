@@ -78,8 +78,10 @@ bookings RLS 目前只有平台管理員 ALL policy，沒有廠商／社區會�
 
 `tests/production-booking.test.js` 以收到的 bigint/FK/timestamptz/time CHECK／GiST 結構建立一次性 PGlite PostgreSQL，並使用 btree_gist；active=pending/confirmed、建立 pending、四表預設及 [) 已確認。所有身分、聯絡欄位及測試預約均合成。資格 approved、取消終態 cancelled、會員配置與審查開關 true 仍只是受控本機 fixture，不代表正式審查已完成。
 
-新增涵蓋會員／付款未審的三種寫入拒絕、重複取消不改原原因且不釋放替代預約、取消中途 outbox 失敗整體回滾、預設值／CHECK 漂移拒絕、pending 不自動合格。`tests/truncate-privileges.test.js` 的 7 項測試以確認的兩個建立者與維護角色驗證最小修正、非目標權限、未來／既有表差異、拒絕未知額外來源、低權限失敗原子回滾，以及精確含 grant option 的基線還原；另在本機合成交易證明 RLS 不防護 TRUNCATE。
+新增涵蓋會員／付款未審的三種寫入拒絕、重複取消不改原原因且不釋放替代預約、取消中途 outbox 失敗整體回滾、預設值／CHECK 漂移拒絕、pending 不自動合格。`tests/truncate-privileges.test.js` 的 9 項測試以確認的兩個建立者與維護角色驗證最小修正、非目標權限、未來／既有表差異、拒絕未知額外來源、低權限失敗原子回滾，以及精確含 grant option 的基線還原；另在本機合成交易證明 RLS 不防護 TRUNCATE。
 
 `tests/postgres_concurrency.py` 在固定官方映像 digest 的 PostgreSQL 17.12 容器，以獨立 psql 連線及 pg_blocking_pids 證明競爭等待，驗證六個場景：同時重疊預約、相同請求 key、雙方重複取消、建立回滾後另一方取得時段、取消回滾後仍占位、取消與重新申請競爭。容器 network=none、listen_addresses 空、無公開埠、資料在 tmpfs，結束移除；不連 Supabase。
 
 完整結果見 [production-booking-test-results.md](production-booking-test-results.md)。未涵蓋正式 Supabase JWT／角色設定、實際核准與付款回呼、外送服務或高負載壓測。舊瀏覽器測試仍只覆蓋 cs_ UI 原型，前端未改接新 RPC。
+
+最新修正前完整基線確認 service_role 對 bookings 的 SELECT/INSERT/UPDATE/DELETE=false；本次不補權。ACL 草稿／本機技術條件與正式執行準備應分開判定，詳見 [truncate-final-safety-review.md](truncate-final-safety-review.md)。

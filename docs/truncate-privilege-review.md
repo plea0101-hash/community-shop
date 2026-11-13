@@ -28,7 +28,7 @@ PostgreSQL 的 TABLES default ACL 依「建立者＋schema」套用，不能只�
 
 ## 保留維護權限及應用限制
 
-腳本不以 service_role/postgres 為撤權對象；bookings owner 不變，service_role 原有 table ACL／default ACL 與 grant options 均保留。本機以額外必要權限作 sentinel 驗證未受影響，不假設正式所有其他 privileges 都是 ALL。
+腳本不以 service_role/postgres 為撤權對象；bookings owner 不變，service_role 原有 table ACL／default ACL 與 grant options 均保留。最新測試已逐項對照使用者的完整基線，service_role 的 SELECT/INSERT/UPDATE/DELETE 保持 false，維護類權限保持 true，不再使用較寬的 ALL 代替這份真實模型。
 
 修正後普通客戶端 TRUNCATE 應失敗，這是預期效果。正常預約、取消、庫存原子操作不依賴客戶端 TRUNCATE；本機在套用修正後驗證兩個建立者新表及六個真實並行預約場景。會員／付款的拒絕預設沒有解除，沒有安裝正式 RPC 或改接前端。
 
@@ -40,4 +40,6 @@ PostgreSQL 的 TABLES default ACL 依「建立者＋schema」套用，不能只�
 
 `sql/rollback/` 提供已知 no-GRANT-OPTION 基線的危險回滾草稿；若保存的基線不同，以修正前 JSON 的精確授權為準，先審查再執行。回滾會重新引入安全暴露，不應作為預約功能出問題時的預設補救。default rollback 不回溯改修正期間已建立的表。
 
-本機 7 項 ACL 測試及真正 PostgreSQL 的快照回滾／預約回歸均已驗證；沒有修改任何正式資料或權限，不宣稱正式漏洞已排除。
+本機 9 項 ACL／精確基線／執行者預檢測試及真正 PostgreSQL 的快照回滾／預約回歸均已驗證；沒有修改任何正式資料或權限，不宣稱正式漏洞已排除。
+
+最後判定及正式執行者的唯讀確認方式見 [truncate-final-safety-review.md](truncate-final-safety-review.md)。正式缺陷仍存在，沒有任何正式修正成功的證據。

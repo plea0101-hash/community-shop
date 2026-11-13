@@ -38,3 +38,8 @@
 - [每一步前後使用的唯讀驗證與基線回滾 SQL 文字](sql/inspection/truncate_fix_verification.sql)
 
 兩份修正都保留 service_role/postgres 維護與非目標權限；default 變更不回溯影響其他既有表，也不解除應用會員／付款的拒絕預設。
+
+- [最後安全審查與正式修正前仍須確認的事項](docs/truncate-final-safety-review.md)
+- [正式執行者唯讀預檢](sql/inspection/truncate_executor_preflight.sql)（僅 catalog 候選判斷，不代表 Supabase 平台授權）
+
+最新測試精確保留正式基線的 service_role 預約表 SELECT/INSERT/UPDATE/DELETE=false；本機通過不代表正式資料庫已修復。

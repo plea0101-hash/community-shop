@@ -72,18 +72,26 @@ try:
     verification=(ROOT/'sql/inspection/truncate_fix_verification.sql').read_text()
     before=json.loads(query(verification).stdout)
     assert not before['checks']['bookings_clients_cannot_truncate']
+    expected=json.loads((ROOT/'tests/fixtures/truncate-baseline.json').read_text())
+    for field in ['bookings_acl','default_acl','effective_permissions']:
+        canonical=lambda rows:sorted(json.dumps(r,sort_keys=True) for r in rows)
+        assert canonical(before[field])==canonical(expected[field]),field
+    assert before['checks']['service_role_bookings_dml_still_absent']
+    authority=json.loads(query((ROOT/'sql/inspection/truncate_executor_preflight.sql').read_text()).stdout)
+    assert authority['catalog_estimate_only'] and authority['managed_platform_authorization_still_required']
     query((ROOT/'sql/drafts/20261113_truncate_minimum.sql').read_text())
     query((ROOT/'sql/drafts/20261113_truncate_default_acl.sql').read_text())
     after=json.loads(query(verification).stdout)
     assert after['checks']['bookings_clients_cannot_truncate'] and after['checks']['future_public_client_truncate_sources_absent']
     maintenance=lambda d:[p for p in d['effective_permissions'] if p['role'] in ('postgres','service_role')]
     assert maintenance(after)==maintenance(before)
+    assert after['checks']['service_role_bookings_dml_still_absent']
     query('CREATE TABLE acl_future_pg(id int); SET ROLE supabase_admin; CREATE TABLE public.acl_future_admin(id int); RESET ROLE;')
     for table in ['acl_future_pg','acl_future_admin']:
         for role in ['anon','authenticated']:
             assert query(f"SELECT has_table_privilege('{role}','{table}','TRUNCATE');").stdout.strip()=='f'
         assert query(f"SELECT has_table_privilege('service_role','{table}','TRUNCATE');").stdout.strip()=='t'
-    print('PASS ACL preflight: both fixes verified, maintenance unchanged, both creators future tables deny client TRUNCATE',flush=True)
+    print('PASS ACL preflight: exact supplied baseline, service DML remains false, executor check is metadata-only; both fixes preserve maintenance and future table protection',flush=True)
     for r in before['rollback_from_snapshot']['defaults']:
         query(r['sql'])
     for r in before['rollback_from_snapshot']['bookings']:
